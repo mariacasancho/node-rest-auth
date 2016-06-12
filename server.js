@@ -8,6 +8,7 @@ var config      = require('./config/database'); // get db config file
 var User        = require('./app/models/user'); // get the mongoose model
 var port 	      = process.env.PORT || 8080;
 var jwt 			  = require('jwt-simple');
+var FacebookStrategy = require('passport-facebook').Strategy;
 
 // get our request parameters
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -18,6 +19,7 @@ app.use(morgan('dev'));
 
 // Use the passport package in our application
 app.use(passport.initialize());
+app.use(passport.session());
 
 // demo Route (GET http://localhost:8080)
 app.get('/', function(req, res) {
@@ -30,8 +32,32 @@ mongoose.connect(config.database);
 // pass passport for configuration
 require('./config/passport')(passport);
 
+passport.use(new FacebookStrategy({
+    clientID: config.facebookid,
+    clientSecret: config.facebooksecret,
+    callbackURL: "http://localhost:" + port + "/auth/facebook/callback"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
+
 // bundle our routes
 var apiRoutes = express.Router();
+
+apiRoutes.get('/auth/facebook',
+  passport.authenticate('facebook'));
+
+apiRoutes.get('/auth/facebook/callback',
+  passport.authenticate('facebook', { failureRedirect: '/auth' }),
+  function(req, res) {
+    console.log(req, res);
+    // Successful authentication, redirect home.
+    res.redirect('/');
+  });
 
 // create a new user account (POST http://localhost:8080/api/signup)
 apiRoutes.post('/signup', function(req, res) {
@@ -40,6 +66,7 @@ apiRoutes.post('/signup', function(req, res) {
   } else {
     var newUser = new User({
       name: req.body.name,
+      username: req.body.username,
       password: req.body.password
     });
     // save the user
@@ -57,7 +84,7 @@ apiRoutes.post('/signup', function(req, res) {
 // route to authenticate a user (POST http://localhost:8080/api/authenticate)
 apiRoutes.post('/authenticate', function(req, res) {
   User.findOne({
-    name: req.body.name
+    username: req.body.username
   }, function(err, user) {
     if (err) throw err;
 
@@ -116,6 +143,8 @@ getToken = function (headers) {
 
 // connect the api routes under /api/*
 app.use('/api', apiRoutes);
+
+app.use(express.static(__dirname + "/public"));
 
 // Start the server
 app.listen(port);

@@ -6,15 +6,11 @@ var bcrypt = require('bcrypt');
 
 // set up a mongoose model
 var UserSchema = new Schema({
-  name: {
-        type: String,
-        unique: true,
-        required: true
-    },
-  password: {
-        type: String,
-        required: true
-    }
+  name: String,
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  admin: Boolean,
+  location: String
 });
 
 UserSchema.pre('save', function (next) {
